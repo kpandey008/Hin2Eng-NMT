@@ -3,17 +3,15 @@ import torch
 import torch.optim as optim
 import torch.nn as nn
 
-from utils.criterion import *
 
-
-_SUPPORTED_DEVICES = ['cpu', 'cuda']
+_SUPPORTED_DEVICES = ['cpu', 'gpu']
 
 
 def configure_device(device):
     if device not in _SUPPORTED_DEVICES:
         raise NotImplementedError(f'The device type `{device}` is not supported')
 
-    if device == 'cuda':
+    if device == 'gpu':
         if not torch.cuda.is_available():
             raise Exception('CUDA support is not available on your platform. Re-run using CPU or TPU mode')
         return 'cuda'

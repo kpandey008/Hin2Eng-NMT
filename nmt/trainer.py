@@ -11,7 +11,7 @@ from config import configure_device, get_lr_scheduler, get_optimizer
 
 class Trainer:
     def __init__(self, train_loader, model, train_loss, val_loader=None, lr_scheduler='poly',
-        batch_size=32, lr=0.01, eval_loss=None, log_step=10, optimizer='SGD', backend='gpu',
+        lr=0.01, eval_loss=None, log_step=10, optimizer='SGD', backend='gpu',
         random_state=0, optimizer_kwargs={}, lr_scheduler_kwargs={}, **kwargs
     ):
         # Create the dataset
@@ -22,11 +22,7 @@ class Trainer:
         self.val_loader = val_loader
         self.log_step = log_step
         self.loss_profile = []
-        self.batch_size = batch_size
 
-        self.train_loader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, drop_last=True, num_workers=0)
-        if self.val_dataset is not None:
-            self.val_loader = DataLoader(self.val_dataset, batch_size=self.batch_size, drop_last=False, num_workers=0)
         self.model = model.to(self.device)
 
         # The parameter train_loss must be a callable
@@ -89,7 +85,7 @@ class Trainer:
     def train_one_epoch(self):
         self.model.train()
         epoch_loss = 0
-        tk0 = self.train_loader
+        tk0 = tqdm(self.train_loader)
         for idx, inputs in enumerate(tk0):
             step_loss = self.train_one_step(inputs)
             epoch_loss += step_loss
@@ -163,7 +159,8 @@ class NMTTrainer(Trainer):
             decoder_input_ids=en,
             decoder_attention_mask=en_attn
         )
-        loss = self.train_criterion(predictions, en)
+        preds = predictions.logits.permute(0, 2, 1).contiguous()
+        loss = self.train_criterion(preds, en)
         loss.backward()
         self.optimizer.step()
         return loss.item()

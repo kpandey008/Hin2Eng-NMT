@@ -8,10 +8,10 @@ from torch.utils.data import Dataset
 class Hin2EngDataset(Dataset):
     # NOTE: In the code, we use the prefix de to denote Devanagri and `en` to denote English
     def __init__(self, de_file_path, en_file_path, de_tokenizer, en_tokenizer, max_length=None):
-        if not os.path.isfile(hindi_file_path):
-            raise Exception(f'Path `{hindi_file_path}` is not a valid file')
-        if not os.path.isfile(english_file_path):
-            raise Exception(f'Path `{english_file_path}` is not a valid file')
+        if not os.path.isfile(de_file_path):
+            raise Exception(f'Path `{de_file_path}` is not a valid file')
+        if not os.path.isfile(en_file_path):
+            raise Exception(f'Path `{en_file_path}` is not a valid file')
 
         self.de_file_path = de_file_path
         self.en_file_path = en_file_path
