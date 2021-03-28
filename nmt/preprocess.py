@@ -1,5 +1,6 @@
 import contractions
 import csv
+import os
 import pandas as pd
 import re
 import string
@@ -83,8 +84,35 @@ def generate_filtered_datasets(raw_file_path, de_save_path, en_save_path):
             en_writer.writerow({'English': filtered_en_text})
 
 
+def train_val_split(de_path, en_path, save_dir, val_prop=0.05):
+    de_text = pd.read_csv(de_path)
+    en_text = pd.read_csv(en_path)
+
+    n_total = de_text.shape[0]
+    n_val = int(val_prop * n_total)
+
+    # Take the last most samples as val set
+    de_text_val = de_text[-n_val:]
+    en_text_val = en_text[-n_val:]
+
+    de_text_train = de_text[:n_total - n_val]
+    en_text_train = en_text[:n_total - n_val]
+
+    # Write files
+    os.makedirs(save_dir, exist_ok=True)
+    de_text_val.to_csv(os.path.join(save_dir, 'val_hindi.csv'), header=True, index=False)
+    en_text_val.to_csv(os.path.join(save_dir, 'val_english.csv'), header=True, index=False)
+
+    de_text_train.to_csv(os.path.join(save_dir, 'train_hindi.csv'), header=True, index=False)
+    en_text_train.to_csv(os.path.join(save_dir, 'train_english.csv'), header=True, index=False)
+
+
 if __name__ == '__main__':
-    raw_file_path = '/home/lexent/Hin2Eng-NMT/nmt/data/raw/train.csv'
-    de_save_path = '/home/lexent/de_cleaned.csv'
-    en_save_path = '/home/lexent/en_cleaned.csv'
-    generate_filtered_datasets(raw_file_path, de_save_path, en_save_path)
+    # raw_file_path = '/home/lexent/Hin2Eng-NMT/nmt/data/raw/train.csv'
+    # de_save_path = '/home/lexent/de_cleaned.csv'
+    # en_save_path = '/home/lexent/en_cleaned.csv'
+    # generate_filtered_datasets(raw_file_path, de_save_path, en_save_path)
+
+    # de_path = '/home/lexent/Hin2Eng-NMT/nmt/data/cleaned/train_hindi.csv'
+    # en_path = '/home/lexent/Hin2Eng-NMT/nmt/data/cleaned/train_english.csv'
+    # train_val_split(de_path, en_path, '/home/lexent/')

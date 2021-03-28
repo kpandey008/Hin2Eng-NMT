@@ -51,8 +51,9 @@ class Trainer:
             self.load(restore_path)
 
         best_eval = 0.0
-        tk0 = tqdm(range(start_epoch, num_epochs))
+        tk0 = range(start_epoch, num_epochs)
         for epoch_idx in tk0:
+            print(f'Training for epoch: {epoch_idx + 1}')
             avg_epoch_loss = self.train_one_epoch()
 
             # LR scheduler step
@@ -74,7 +75,7 @@ class Trainer:
                         self.save(save_path, epoch_idx, prefix='best')
                         best_eval = val_eval
             else:
-                tk0.set_postfix_str(f'Avg Loss for epoch:{avg_epoch_loss}')
+                print(f'Avg Loss for epoch:{avg_epoch_loss}')
                 if epoch_idx % 10 == 0:
                     # Save the model every 10 epochs anyways
                     self.save(save_path, epoch_idx)
@@ -89,6 +90,7 @@ class Trainer:
         for idx, inputs in enumerate(tk0):
             step_loss = self.train_one_step(inputs)
             epoch_loss += step_loss
+            tk0.set_postfix_str(f'Avg Loss for step:{step_loss}')
         return epoch_loss/ len(self.train_loader)
 
     def train_one_step(self):
