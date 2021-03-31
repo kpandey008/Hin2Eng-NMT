@@ -13,7 +13,7 @@ from metrics import MeteorScore
 
 class Trainer:
     def __init__(self, train_loader, model, train_loss, val_loader=None, lr_scheduler='poly',
-        lr=0.01, eval_loss=None, eval_key=None, log_step=10, optimizer='SGD', backend='gpu',
+        lr=0.01, eval_loss=None, log_step=50, optimizer='SGD', backend='gpu',
         random_state=0, optimizer_kwargs={}, lr_scheduler_kwargs={}, **kwargs
     ):
         # Create the dataset
@@ -98,7 +98,8 @@ class Trainer:
         for idx, inputs in enumerate(tk0):
             step_loss = self.train_one_step(inputs)
             epoch_loss += step_loss
-            tk0.set_postfix_str(f'Avg Loss for step:{step_loss}')
+            if idx % self.log_step == 0:
+                tk0.set_postfix_str(f'Avg Loss for step:{step_loss}')
         return epoch_loss/ len(self.train_loader)
 
     def train_one_step(self):
