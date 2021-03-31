@@ -196,11 +196,8 @@ class TransformersForNmtTrainer(Trainer):
                     attention_mask=de_attn,
                 )
 
-                pred_indices = nn.Softmax(dim=2)(predictions.logits)
-                pred_indices = torch.argmax(pred_indices, dim=2)
                 # Decode the indices using the tokenizer
-
                 gt = self.val_loader.dataset.en_tokenizer.decode_batch(list(en.cpu().numpy()))
-                preds = self.val_loader.dataset.en_tokenizer.decode_batch(list(pred_indices.cpu().numpy()))
+                preds = self.val_loader.dataset.en_tokenizer.decode_batch(list(predictions.cpu().numpy()))
                 meteor.add(gt, preds)
             return meteor.value()
