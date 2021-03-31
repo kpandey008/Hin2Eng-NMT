@@ -7,11 +7,12 @@ import torch
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 from config import configure_device, get_lr_scheduler, get_optimizer
+from metrics import MeteorScore
 
 
 class Trainer:
     def __init__(self, train_loader, model, train_loss, val_loader=None, lr_scheduler='poly',
-        lr=0.01, eval_loss=None, log_step=10, optimizer='SGD', backend='gpu',
+        lr=0.01, eval_loss=None, eval_key=None, log_step=10, optimizer='SGD', backend='gpu',
         random_state=0, optimizer_kwargs={}, lr_scheduler_kwargs={}, **kwargs
     ):
         # Create the dataset
@@ -43,14 +44,21 @@ class Trainer:
             torch.backends.cudnn.deterministic = True
             torch.backends.cudnn.benchmark = False
 
-    def train(self, num_epochs, save_path, restore_path=None):
+    def train(self, num_epochs, save_path, restore_path=None, save_criterion='min',
+        epoch_save_interval=1
+    ):
+        assert save_criterion in ['max', 'min']
+
+        # Configure lr scheduler
         self.lr_scheduler = get_lr_scheduler(self.optimizer, num_epochs, sched_type=self.sched_type, **self.sched_kwargs)
-        start_epoch = 0
+
+        # Restore checkpoint if available
         if restore_path is not None:
             # Load the model
             self.load(restore_path)
 
         best_eval = 0.0
+        start_epoch = 0
         tk0 = range(start_epoch, num_epochs)
         for epoch_idx in tk0:
             print(f'Training for epoch: {epoch_idx + 1}')
@@ -63,25 +71,24 @@ class Trainer:
             self.loss_profile.append(avg_epoch_loss)
 
             # Evaluate the model
-            if self.val_criterion is not None:
+            if self.val_loader is not None:
                 val_eval = self.eval()
-                tk0.set_postfix_str(f'Avg Loss for epoch: {avg_epoch_loss} Eval Loss: {val_eval}')
+                print(f'Avg Loss for epoch: {avg_epoch_loss} Eval Metric: {val_eval}')
                 if epoch_idx == 0:
                     best_eval = val_eval
                     self.save(save_path, epoch_idx, prefix='best')
                 else:
-                    if best_eval > val_eval:
-                        # Save this model checkpoint
+                    is_save = (best_eval > val_eval) if save_criterion == 'max' else (best_eval < val_eval)
+                    if is_save:
+                        # Save checkpoint
                         self.save(save_path, epoch_idx, prefix='best')
                         best_eval = val_eval
             else:
                 print(f'Avg Loss for epoch:{avg_epoch_loss}')
-                if epoch_idx % 10 == 0:
-                    # Save the model every 10 epochs anyways
-                    self.save(save_path, epoch_idx)
 
-    def eval(self):
-        raise NotImplementedError()
+            # Save every provided interval anyways
+            if epoch_idx % epoch_save_interval == 0:
+                self.save(save_path, epoch_idx)
 
     def train_one_epoch(self):
         self.model.train()
@@ -94,7 +101,10 @@ class Trainer:
         return epoch_loss/ len(self.train_loader)
 
     def train_one_step(self):
-        raise NotImplementedError
+        raise NotImplementedError()
+
+    def eval(self):
+        raise NotImplementedError()
 
     def save(self, path, epoch_id, prefix=''):
         checkpoint_name = f'chkpt_{epoch_id}'
@@ -166,3 +176,31 @@ class NMTTrainer(Trainer):
         loss.backward()
         self.optimizer.step()
         return loss.item()
+
+    def eval(self, inputs):
+        self.model.eval()
+        tk0 = tqdm(self.val_loader)
+        meteor = MeteorScore()
+        with torch.no_grad():
+            for idx, inputs in enumerate(tk0):
+                de, de_attn, en, en_attn = inputs
+                de = de.to(self.device)
+                de_attn = de_attn.to(self.device)
+                en = en.to(self.device)
+                en_attn = en_attn.to(self.device)
+
+                predictions = self.model(
+                    input_ids=de,
+                    attention_mask=de_attn,
+                    decoder_input_ids=en,
+                    decoder_attention_mask=en_attn
+                )
+
+                pred_indices = nn.Softmax(dim=2)(predictions.logits)
+                pred_indices = torch.argmax(pred_indices, dim=2)
+                # Decode the indices using the tokenizer
+
+                gt = self.val_loader.dataset.en_tokenizer.decode_batch(list(en.numpy()))
+                preds = self.val_loader.dataset.en_tokenizer.decode_batch(list(pred_indices.numpy()))
+                meteor.add(gt, preds)
+            return meteor.value()
