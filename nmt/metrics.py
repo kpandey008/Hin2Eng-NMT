@@ -32,7 +32,6 @@ class MeteorScore(Metric):
     def add(self, s1, s2):
         assert len(s1) == len(s2)
         for s1_, s2_ in zip(s1, s2):
-            print(single_meteor_score(s1_, s2_))
             self._agg_meteor += single_meteor_score(s1_, s2_)
             self.counter += 1
 

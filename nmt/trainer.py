@@ -3,6 +3,7 @@ import gc
 import numpy as np
 import os
 import torch
+import torch.nn as nn
 
 from tqdm import tqdm
 from torch.utils.data import DataLoader
@@ -155,7 +156,7 @@ class Trainer:
             self.lr_scheduler.load_state_dict(state_dict['scheduler'])
 
 
-class NMTTrainer(Trainer):
+class TransformersForNmtTrainer(Trainer):
     def train_one_step(self, inputs):
         self.optimizer.zero_grad()
 
@@ -177,7 +178,7 @@ class NMTTrainer(Trainer):
         self.optimizer.step()
         return loss.item()
 
-    def eval(self, inputs):
+    def eval(self):
         self.model.eval()
         tk0 = tqdm(self.val_loader)
         meteor = MeteorScore()
@@ -189,18 +190,16 @@ class NMTTrainer(Trainer):
                 en = en.to(self.device)
                 en_attn = en_attn.to(self.device)
 
-                predictions = self.model(
+                predictions = self.model.generate(
                     input_ids=de,
                     attention_mask=de_attn,
-                    decoder_input_ids=en,
-                    decoder_attention_mask=en_attn
                 )
 
                 pred_indices = nn.Softmax(dim=2)(predictions.logits)
                 pred_indices = torch.argmax(pred_indices, dim=2)
                 # Decode the indices using the tokenizer
 
-                gt = self.val_loader.dataset.en_tokenizer.decode_batch(list(en.numpy()))
-                preds = self.val_loader.dataset.en_tokenizer.decode_batch(list(pred_indices.numpy()))
+                gt = self.val_loader.dataset.en_tokenizer.decode_batch(list(en.cpu().numpy()))
+                preds = self.val_loader.dataset.en_tokenizer.decode_batch(list(pred_indices.cpu().numpy()))
                 meteor.add(gt, preds)
             return meteor.value()
