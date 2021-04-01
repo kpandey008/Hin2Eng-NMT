@@ -15,7 +15,7 @@ from metrics import MeteorScore, BLEUScore
 class Trainer:
     def __init__(self, train_loader, model, num_epochs, val_loader=None, lr_scheduler='poly',
         lr=0.0001, log_step=50, n_train_steps_per_epoch=None, optimizer='Adam', backend='gpu',
-        n_val_steps=None, optimizer_kwargs={}, lr_scheduler_kwargs={}, **kwargs
+        results_dir=None, n_val_steps=None, optimizer_kwargs={}, lr_scheduler_kwargs={}, **kwargs
     ):
         # Create the dataset
         self.train_loader = train_loader
@@ -29,6 +29,10 @@ class Trainer:
         self.n_val_steps = n_val_steps
         self.train_progress_bar = None
         self.val_progress_bar = None
+        self.results_dir = results_dir
+
+        if (self.results_dir is not None) and (not os.path.isdir(self.results_dir)):
+            os.makedirs(self.results_dir, exist_ok=True)
 
         self.model = model.to(self.device)
 
@@ -170,11 +174,10 @@ class Trainer:
 
 
 class TransformersForNmtTrainer(Trainer):
-    def init(self, save_path=None, chkpt_name=None):
+    def init(self):
         self.tokenizer = self.train_loader.dataset.tokenizer
         self.meteor_score = MeteorScore()
         self.best_score = 0
-        self.save_path = save_path
         self.chkpt_name = 'chkpt' if chkpt_name is None else chkpt_name
 
     def train_step(self, inputs):
@@ -229,5 +232,5 @@ class TransformersForNmtTrainer(Trainer):
 
         if self.best_score > avg_meteor:
             self.best_score = avg_meteor
-            if self.save_path is not None:
-                self.save(self.save_path, self.chkpt_name, prefix='best')
+            if self.results_dir is not None:
+                self.save(self.results_dir, self.chkpt_name, prefix='best')
