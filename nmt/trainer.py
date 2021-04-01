@@ -4,6 +4,7 @@ import numpy as np
 import os
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from tqdm import tqdm
 from torch.utils.data import DataLoader
@@ -14,8 +15,7 @@ from metrics import MeteorScore, BLEUScore
 class Trainer:
     def __init__(self, train_loader, model, num_epochs, val_loader=None, lr_scheduler='poly',
         lr=0.0001, log_step=50, n_train_steps_per_epoch=None, optimizer='Adam', backend='gpu',
-        n_val_steps=None, optimizer_kwargs={}, lr_scheduler_kwargs={}, save_path=None,
-        epoch_save_interval=1, **kwargs
+        n_val_steps=None, optimizer_kwargs={}, lr_scheduler_kwargs={}, **kwargs
     ):
         # Create the dataset
         self.train_loader = train_loader
@@ -29,7 +29,6 @@ class Trainer:
         self.n_val_steps = n_val_steps
         self.train_progress_bar = None
         self.val_progress_bar = None
-        self.save_path = save_path
 
         self.model = model.to(self.device)
 
@@ -41,11 +40,11 @@ class Trainer:
         self.init()
 
     def init(self):
-        raise NotImplementedError()
+        pass
 
     def train(self, restore_path=None):
         # Configure lr scheduler
-        self.lr_scheduler = get_lr_scheduler(self.optimizer, num_epochs, sched_type=self.sched_type, **self.sched_kwargs)
+        self.lr_scheduler = get_lr_scheduler(self.optimizer, self.num_epochs, sched_type=self.sched_type, **self.sched_kwargs)
 
         # Restore checkpoint if available
         if restore_path is not None:
@@ -54,7 +53,7 @@ class Trainer:
 
         best_eval = 0.0
         start_epoch = 0
-        tk0 = range(start_epoch, num_epochs)
+        tk0 = range(start_epoch, self.num_epochs)
 
         self.epoch_idx = 0
         for _ in tk0:
@@ -95,10 +94,10 @@ class Trainer:
         raise NotImplementedError()
 
     def on_train_epoch_end(self):
-        raise NotImplementedError()
+        pass
 
     def on_train_step_end(self):
-        raise NotImplementedError()
+        pass
 
     def eval(self):
         self.model.eval()
@@ -116,10 +115,10 @@ class Trainer:
         raise NotImplementedError()
 
     def on_val_epoch_end(self):
-        raise NotImplementedError()
+        pass
 
     def on_val_step_end(self):
-        raise NotImplementedError()
+        pass
 
     def save(self, path, name, prefix=None):
         checkpoint_name = f'{name}_{prefix}' if prefix is not None else name
@@ -171,10 +170,12 @@ class Trainer:
 
 
 class TransformersForNmtTrainer(Trainer):
-    def init(self):
+    def init(self, save_path=None, chkpt_name=None):
+        self.tokenizer = self.train_loader.dataset.tokenizer
         self.meteor_score = MeteorScore()
-        self.blue_score = BLEUScore()
         self.best_score = 0
+        self.save_path = save_path
+        self.chkpt_name = 'chkpt' if chkpt_name is None else chkpt_name
 
     def train_step(self, inputs):
         self.optimizer.zero_grad()
@@ -198,7 +199,7 @@ class TransformersForNmtTrainer(Trainer):
         rearranged_output = predictions.view(predictions.shape[0]*predictions.shape[1], -1)
         rearranged_target = targets.contiguous().view(-1)
 
-        loss = F.cross_entropy(rearranged_output, rearranged_target, ignore_index=tokenizer.convert_tokens_to_ids('[PAD]'))
+        loss = F.cross_entropy(rearranged_output, rearranged_target, ignore_index=self.tokenizer.convert_tokens_to_ids('[PAD]'))
         loss.backward()
         self.optimizer.step()
         return loss.item()
@@ -214,21 +215,19 @@ class TransformersForNmtTrainer(Trainer):
         predictions = self.model.generate(
             input_ids=de,
             attention_mask=de_attn,
-            decoder_start_token_id=tokenizer.convert_tokens_to_ids('[CLS]'),
+            decoder_start_token_id=self.tokenizer.convert_tokens_to_ids('[CLS]'),
         )
 
         # Decode the indices using the tokenizer
-        gt = self.val_loader.dataset.tokenizer.batch_decode(list(en.cpu().numpy()))
-        preds = self.val_loader.dataset.tokenizer.batch_decode(list(predictions.cpu().numpy()))
+        gt = self.tokenizer.batch_decode(list(en.cpu().numpy()))
+        preds = self.tokenizer.batch_decode(list(predictions.cpu().numpy()))
         self.meteor_score.add(gt, preds)
-        self.bleu_score.add(gt, preds)
 
     def on_val_epoch_end(self):
         avg_meteor = self.meteor_score.value()
-        avg_bleu = self.bleu_score.value()
-        print(f'Average BLEU score: {avg_bleu}, Meteor score: {avg_meteor}')
+        print(f'Average Meteor score: {avg_meteor}')
 
-        if self.best > avg_meteor:
-            self.best = avg_meteor
+        if self.best_score > avg_meteor:
+            self.best_score = avg_meteor
             if self.save_path is not None:
-                self.save(self.save_path, name, prefix='best')
+                self.save(self.save_path, self.chkpt_name, prefix='best')

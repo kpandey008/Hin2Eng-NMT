@@ -6,7 +6,7 @@ import warnings
 
 from tokenizers import Tokenizer
 from transformers import EncoderDecoderModel
-from trainer import NMTTrainer
+from trainer import TransformersForNmtTrainer
 
 
 def seed_everything(seed=0):
@@ -37,7 +37,7 @@ def seed_everything(seed=0):
 # NOTE: Keeping the model as a param here as it will change a lot during experimentation
 # TODO: Complete this implementation after experimentation is done
 def train_nmt(
-    train_en_path, train_de_path, model
+    train_en_path, train_de_path, model,
     en_tokenizer_path, de_tokenizer_path, n_epochs=100, code_size=10, device='cpu',
     batch_size=32, random_state=0, save_path=os.getcwd(), trainer_kwargs={}
 ):
