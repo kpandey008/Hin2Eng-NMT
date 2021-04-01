@@ -25,6 +25,12 @@ def seed_everything(seed=0):
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
+    torch.set_default_tensor_type('torch.FloatTensor')
+    
+    # Set a deterministic CuDNN backend
+    if torch.cuda.is_available():
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
     return seed
 
 

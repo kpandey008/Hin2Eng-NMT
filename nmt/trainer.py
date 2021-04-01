@@ -8,49 +8,42 @@ import torch.nn as nn
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 from config import configure_device, get_lr_scheduler, get_optimizer
-from metrics import MeteorScore
+from metrics import MeteorScore, BLEUScore
 
 
 class Trainer:
-    def __init__(self, train_loader, model, train_loss, val_loader=None, lr_scheduler='poly',
-        lr=0.01, eval_loss=None, log_step=50, max_steps_per_epoch=None, optimizer='SGD', backend='gpu',
-        random_state=0, optimizer_kwargs={}, lr_scheduler_kwargs={}, **kwargs
+    def __init__(self, train_loader, model, num_epochs, val_loader=None, lr_scheduler='poly',
+        lr=0.0001, log_step=50, n_train_steps_per_epoch=None, optimizer='Adam', backend='gpu',
+        n_val_steps=None, optimizer_kwargs={}, lr_scheduler_kwargs={}, save_path=None,
+        epoch_save_interval=1, **kwargs
     ):
         # Create the dataset
-        self.lr = lr
-        self.random_state = random_state
-        self.device = configure_device(backend)
         self.train_loader = train_loader
+        self.num_epochs = num_epochs
+        self.lr = lr
+        self.device = configure_device(backend)
         self.val_loader = val_loader
         self.log_step = log_step
         self.loss_profile = []
-        self.max_steps_per_epoch = max_steps_per_epoch
+        self.n_train_steps_per_epoch = n_train_steps_per_epoch
+        self.n_val_steps = n_val_steps
+        self.train_progress_bar = None
+        self.val_progress_bar = None
+        self.save_path = save_path
 
         self.model = model.to(self.device)
-
-        # The parameter train_loss must be a callable
-        self.train_criterion = train_loss
-
-        # The parameter eval_loss must be a callable
-        self.val_criterion = eval_loss
 
         self.optimizer = get_optimizer(optimizer, self.model, self.lr, **optimizer_kwargs)
         self.sched_type = lr_scheduler
         self.sched_kwargs = lr_scheduler_kwargs
 
-        # Some initialization code
-        torch.manual_seed(self.random_state)
-        torch.set_default_tensor_type('torch.FloatTensor')
-        if self.device == 'gpu':
-            # Set a deterministic CuDNN backend
-            torch.backends.cudnn.deterministic = True
-            torch.backends.cudnn.benchmark = False
+        # Call some custom initialization here
+        self.init()
 
-    def train(self, num_epochs, save_path, restore_path=None, save_criterion='min',
-        epoch_save_interval=1
-    ):
-        assert save_criterion in ['max', 'min']
+    def init(self):
+        raise NotImplementedError()
 
+    def train(self, restore_path=None):
         # Configure lr scheduler
         self.lr_scheduler = get_lr_scheduler(self.optimizer, num_epochs, sched_type=self.sched_type, **self.sched_kwargs)
 
@@ -62,9 +55,12 @@ class Trainer:
         best_eval = 0.0
         start_epoch = 0
         tk0 = range(start_epoch, num_epochs)
-        for epoch_idx in tk0:
-            print(f'Training for epoch: {epoch_idx + 1}')
+
+        self.epoch_idx = 0
+        for _ in tk0:
+            print(f'Training for epoch: {self.epoch_idx + 1}')
             avg_epoch_loss = self.train_one_epoch()
+            print(f'Avg Loss for epoch:{avg_epoch_loss}')
 
             # LR scheduler step
             self.lr_scheduler.step()
@@ -74,46 +70,59 @@ class Trainer:
 
             # Evaluate the model
             if self.val_loader is not None:
-                val_eval = self.eval()
-                print(f'Avg Loss for epoch: {avg_epoch_loss} Eval Metric: {val_eval}')
-                if epoch_idx == 0:
-                    best_eval = val_eval
-                    self.save(save_path, epoch_idx, prefix='best')
-                else:
-                    is_save = (best_eval > val_eval) if save_criterion == 'max' else (best_eval < val_eval)
-                    if is_save:
-                        # Save checkpoint
-                        self.save(save_path, epoch_idx, prefix='best')
-                        best_eval = val_eval
-            else:
-                print(f'Avg Loss for epoch:{avg_epoch_loss}')
+                self.eval()
 
-            # Save every provided interval anyways
-            if epoch_idx % epoch_save_interval == 0:
-                self.save(save_path, epoch_idx)
+            self.epoch_idx += 1
 
     def train_one_epoch(self):
         self.model.train()
         epoch_loss = 0
-        tk0 = tqdm(self.train_loader)
-        for idx, inputs in enumerate(tk0):
-            if self.max_steps_per_epoch is not None and \
-                (idx + 1) > self.max_steps_per_epoch:
+        self.train_progress_bar = tqdm(self.train_loader)
+        for idx, inputs in enumerate(self.train_progress_bar):
+            if self.n_train_steps_per_epoch is not None and \
+                (idx + 1) > self.n_train_steps_per_epoch:
                 break
-            step_loss = self.train_one_step(inputs)
+            step_loss = self.train_step(inputs)
+            self.on_train_step_end()
             epoch_loss += step_loss
             if idx % self.log_step == 0:
-                tk0.set_postfix_str(f'Avg Loss for step:{step_loss}')
+                self.train_progress_bar.set_postfix_str(f'Avg Loss for step {idx + 1} : {step_loss}')
+
+        self.on_train_epoch_end()
         return epoch_loss/ len(self.train_loader)
 
-    def train_one_step(self):
+    def train_step(self):
+        raise NotImplementedError()
+
+    def on_train_epoch_end(self):
+        raise NotImplementedError()
+
+    def on_train_step_end(self):
         raise NotImplementedError()
 
     def eval(self):
+        self.model.eval()
+        self.val_progress_bar = tqdm(self.val_loader)
+        with torch.no_grad():
+            for idx, inputs in enumerate(self.val_progress_bar):
+                if self.n_val_steps is not None and \
+                    (idx + 1) > self.n_val_steps:
+                    break
+                self.val_step(inputs)
+                self.on_val_step_end()
+            self.on_val_epoch_end()
+
+    def val_step(self):
         raise NotImplementedError()
 
-    def save(self, path, epoch_id, prefix=''):
-        checkpoint_name = f'chkpt_{epoch_id}'
+    def on_val_epoch_end(self):
+        raise NotImplementedError()
+
+    def on_val_step_end(self):
+        raise NotImplementedError()
+
+    def save(self, path, name, prefix=None):
+        checkpoint_name = f'{name}_{prefix}' if prefix is not None else name
         path = os.path.join(path, prefix)
         checkpoint_path = os.path.join(path, f'{checkpoint_name}.pt')
         state_dict = {}
@@ -128,7 +137,7 @@ class Trainer:
         state_dict['model'] = model_state
         state_dict['optimizer'] = optim_state
         state_dict['scheduler'] = self.lr_scheduler.state_dict()
-        state_dict['epoch'] = epoch_id + 1
+        state_dict['epoch'] = self.epoch_idx + 1
         state_dict['loss_profile'] = self.loss_profile
 
         os.makedirs(path, exist_ok=True)
@@ -162,46 +171,64 @@ class Trainer:
 
 
 class TransformersForNmtTrainer(Trainer):
-    def train_one_step(self, inputs):
-        self.optimizer.zero_grad()
+    def init(self):
+        self.meteor_score = MeteorScore()
+        self.blue_score = BLEUScore()
+        self.best_score = 0
 
+    def train_step(self, inputs):
+        self.optimizer.zero_grad()
+        de, de_attn, en, en_attn = inputs
+        de = de.to(self.device)
+        de_attn = de_attn.to(self.device)
+        en = en.to(self.device)
+        en_attn = en_attn.to(self.device)
+        lm_labels = en.clone()
+
+        predictions_ = self.model(
+            input_ids=de,
+            attention_mask=de_attn,
+            decoder_input_ids=en,
+            decoder_attention_mask=en_attn,
+        )
+        predictions = predictions_.logits
+        predictions = predictions[:, :-1, :].contiguous()
+        targets = en[:, 1:]
+
+        rearranged_output = predictions.view(predictions.shape[0]*predictions.shape[1], -1)
+        rearranged_target = targets.contiguous().view(-1)
+
+        loss = F.cross_entropy(rearranged_output, rearranged_target, ignore_index=tokenizer.convert_tokens_to_ids('[PAD]'))
+        loss.backward()
+        self.optimizer.step()
+        return loss.item()
+
+    def val_step(self, inputs):
+        meteor = MeteorScore()
         de, de_attn, en, en_attn = inputs
         de = de.to(self.device)
         de_attn = de_attn.to(self.device)
         en = en.to(self.device)
         en_attn = en_attn.to(self.device)
 
-        predictions = self.model(
+        predictions = self.model.generate(
             input_ids=de,
             attention_mask=de_attn,
-            decoder_input_ids=en,
-            decoder_attention_mask=en_attn
+            decoder_start_token_id=tokenizer.convert_tokens_to_ids('[CLS]'),
         )
-        preds = predictions.logits.permute(0, 2, 1).contiguous()
-        loss = self.train_criterion(preds, en)
-        loss.backward()
-        self.optimizer.step()
-        return loss.item()
 
-    def eval(self):
-        self.model.eval()
-        tk0 = tqdm(self.val_loader)
-        meteor = MeteorScore()
-        with torch.no_grad():
-            for idx, inputs in enumerate(tk0):
-                de, de_attn, en, en_attn = inputs
-                de = de.to(self.device)
-                de_attn = de_attn.to(self.device)
-                en = en.to(self.device)
-                en_attn = en_attn.to(self.device)
+        # Decode the indices using the tokenizer
+        gt = self.val_loader.dataset.tokenizer.batch_decode(list(en.cpu().numpy()))
+        preds = self.val_loader.dataset.tokenizer.batch_decode(list(predictions.cpu().numpy()))
+        self.meteor_score.add(gt, preds)
+        self.bleu_score.add(gt, preds)
 
-                predictions = self.model.generate(
-                    input_ids=de,
-                    attention_mask=de_attn,
-                )
+    def on_val_epoch_end(self):
+        avg_meteor = self.meteor_score.value()
+        avg_bleu = self.bleu_score.value()
+        print(f'Average BLEU score: {avg_bleu}, Meteor score: {avg_meteor}')
 
-                # Decode the indices using the tokenizer
-                gt = self.val_loader.dataset.en_tokenizer.decode_batch(list(en.cpu().numpy()))
-                preds = self.val_loader.dataset.en_tokenizer.decode_batch(list(predictions.cpu().numpy()))
-                meteor.add(gt, preds)
-            return meteor.value()
+        if self.best > avg_meteor:
+            self.best = avg_meteor
+            if self.save_path is not None:
+                self.save(self.save_path, name, prefix='best')
