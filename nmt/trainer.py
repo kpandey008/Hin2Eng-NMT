@@ -98,7 +98,7 @@ class Trainer:
         tk0 = tqdm(self.train_loader)
         for idx, inputs in enumerate(tk0):
             if self.max_steps_per_epoch is not None and \
-                (idx + 1) > max_steps_per_epoch:
+                (idx + 1) > self.max_steps_per_epoch:
                 break
             step_loss = self.train_one_step(inputs)
             epoch_loss += step_loss
