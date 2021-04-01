@@ -7,7 +7,7 @@ from torch.utils.data import Dataset
 
 class Hin2EngDataset(Dataset):
     # NOTE: In the code, we use the prefix de to denote Devanagri and `en` to denote English
-    def __init__(self, de_file_path, en_file_path, de_tokenizer, en_tokenizer, max_length=None):
+    def __init__(self, de_file_path, en_file_path, tokenizer, max_length=None):
         if not os.path.isfile(de_file_path):
             raise Exception(f'Path `{de_file_path}` is not a valid file')
         if not os.path.isfile(en_file_path):
@@ -20,8 +20,7 @@ class Hin2EngDataset(Dataset):
         self.de_text = pd.read_csv(self.de_file_path)
         self.en_text = pd.read_csv(self.en_file_path)
 
-        self.de_tokenizer = de_tokenizer
-        self.en_tokenizer = en_tokenizer
+        self.tokenizer = tokenizer
 
     def __getitem__(self, idx):
         de_text = self.de_text['Hindi'][idx]
@@ -30,31 +29,18 @@ class Hin2EngDataset(Dataset):
 
     def collate_fn(self, batch):
         de_batch, en_batch = zip(*batch)
-
-        # Enable padding when encoding
-        self.de_tokenizer.enable_padding(
-            pad_id=self.de_tokenizer.token_to_id('[PAD]'),
-            pad_token="[PAD]"
-        )
-        self.en_tokenizer.enable_padding(
-            pad_id=self.en_tokenizer.token_to_id('[PAD]'),
-            pad_token="[PAD]"
-        )
-
-        # Enable truncation if max_length is set
-        if self.max_length is not None:
-            self.de_tokenizer.enable_truncation(self.max_length)
-            self.en_tokenizer.enable_truncation(self.max_length)
+        de_batch = list(de_batch)
+        en_batch = list(en_batch)
 
         # Encode batches and compute token ids and attention masks
-        de_batch_enc = self.de_tokenizer.encode_batch(de_batch)
-        en_batch_enc = self.en_tokenizer.encode_batch(en_batch)
+        de_batch_enc = self.tokenizer(de_batch, add_special_tokens=True, padding=True)
+        en_batch_enc = self.tokenizer(en_batch, add_special_tokens=True, padding=True)
 
-        de_batch_enc_ids = torch.Tensor([enc.ids for enc in de_batch_enc]).to(torch.int64)
-        en_batch_enc_ids = torch.Tensor([enc.ids for enc in en_batch_enc]).to(torch.int64)
+        de_batch_enc_ids = torch.Tensor(de_batch_enc['input_ids']).to(torch.int64)
+        en_batch_enc_ids = torch.Tensor(en_batch_enc['input_ids']).to(torch.int64)
 
-        de_batch_enc_mask = torch.Tensor([enc.attention_mask for enc in de_batch_enc]).to(torch.int64)
-        en_batch_enc_mask = torch.Tensor([enc.attention_mask for enc in en_batch_enc]).to(torch.int64)
+        de_batch_enc_mask = torch.Tensor(de_batch_enc['attention_mask']).to(torch.int64)
+        en_batch_enc_mask = torch.Tensor(en_batch_enc['attention_mask']).to(torch.int64)
 
         return de_batch_enc_ids, de_batch_enc_mask, en_batch_enc_ids, en_batch_enc_mask
 
