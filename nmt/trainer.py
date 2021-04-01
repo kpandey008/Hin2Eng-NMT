@@ -13,7 +13,7 @@ from metrics import MeteorScore
 
 class Trainer:
     def __init__(self, train_loader, model, train_loss, val_loader=None, lr_scheduler='poly',
-        lr=0.01, eval_loss=None, log_step=50, optimizer='SGD', backend='gpu',
+        lr=0.01, eval_loss=None, log_step=50, max_steps_per_epoch=None, optimizer='SGD', backend='gpu',
         random_state=0, optimizer_kwargs={}, lr_scheduler_kwargs={}, **kwargs
     ):
         # Create the dataset
@@ -24,6 +24,7 @@ class Trainer:
         self.val_loader = val_loader
         self.log_step = log_step
         self.loss_profile = []
+        self.max_steps_per_epoch = max_steps_per_epoch
 
         self.model = model.to(self.device)
 
@@ -96,6 +97,9 @@ class Trainer:
         epoch_loss = 0
         tk0 = tqdm(self.train_loader)
         for idx, inputs in enumerate(tk0):
+            if self.max_steps_per_epoch is not None and \
+                (idx + 1) > max_steps_per_epoch:
+                break
             step_loss = self.train_one_step(inputs)
             epoch_loss += step_loss
             if idx % self.log_step == 0:
