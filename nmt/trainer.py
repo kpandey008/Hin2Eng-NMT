@@ -39,6 +39,7 @@ class Trainer:
         self.optimizer = get_optimizer(optimizer, self.model, self.lr, **optimizer_kwargs)
         self.sched_type = lr_scheduler
         self.sched_kwargs = lr_scheduler_kwargs
+        self.start_epoch = 0
 
         # Call some custom initialization here
         self.init()
@@ -56,8 +57,7 @@ class Trainer:
             self.load(restore_path)
 
         best_eval = 0.0
-        start_epoch = 0
-        tk0 = range(start_epoch, self.num_epochs)
+        tk0 = range(self.start_epoch, self.num_epochs)
 
         self.epoch_idx = 0
         for _ in tk0:
@@ -126,7 +126,7 @@ class Trainer:
 
     def save(self, path, name, prefix=None):
         checkpoint_name = f'{name}_{prefix}' if prefix is not None else name
-        path = os.path.join(path, prefix)
+        path = path if prefix is None else os.path.join(path, prefix)
         checkpoint_path = os.path.join(path, f'{checkpoint_name}.pt')
         state_dict = {}
         model_state = copy.deepcopy(self.model.state_dict())
@@ -166,7 +166,7 @@ class Trainer:
             for state in self.optimizer.state.values():
                 for k, v in state.items():
                     if isinstance(v, torch.Tensor):
-                        state[k] = v.to(device)
+                        state[k] = v.to(self.device)
 
         if 'scheduler' in state_dict:
             print('Restoring Learning Rate scheduler state')
@@ -236,3 +236,6 @@ class TransformersForNmtTrainer(Trainer):
             self.best_score = avg_meteor
             if self.results_dir is not None:
                 self.save(self.results_dir, self.chkpt_name, prefix='best')
+
+        # Reset the metric
+        self.meteor_score.reset()
