@@ -222,10 +222,8 @@ class TransformersForNmtTrainer(Trainer):
         )
 
         # Decode the indices using the tokenizer
-        # TODO: Need to account for the special tokens
-        # when computing the metrics!
-        gt = self.tokenizer.batch_decode(list(en.cpu().numpy()))
-        preds = self.tokenizer.batch_decode(list(predictions.cpu().numpy()), skip_special_tokens=True)
+        gt = self.val_loader.dataset.decode_batch(list(en.cpu().numpy()))
+        preds = self.val_loader.dataset.decode_batch(list(predictions.cpu().numpy()))
         self.meteor_score.add(gt, preds)
 
     def on_val_epoch_end(self):
