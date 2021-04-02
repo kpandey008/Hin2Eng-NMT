@@ -36,7 +36,9 @@ class MeteorScore(Metric):
             self.counter += 1
 
     def value(self):
-        return self._agg_meteor / self.counter
+        val = self._agg_meteor / self.counter
+        self.reset()
+        return val
 
 
 class BLEUScore(Metric):
@@ -55,4 +57,6 @@ class BLEUScore(Metric):
             self.counter += 1
 
     def value(self):
-        return self._agg_bleu / self.counter
+        val = self._agg_bleu / self.counter
+        self.reset()
+        return val
