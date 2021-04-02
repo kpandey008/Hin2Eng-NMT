@@ -1,3 +1,4 @@
+import numpy as np
 import os
 import pandas as pd
 import torch
@@ -33,16 +34,40 @@ class Hin2EngDataset(Dataset):
         en_batch = list(en_batch)
 
         # Encode batches and compute token ids and attention masks
-        de_batch_enc = self.tokenizer(de_batch, add_special_tokens=True, padding=True)
-        en_batch_enc = self.tokenizer(en_batch, add_special_tokens=True, padding=True)
+        de_batch_enc = self.tokenizer(
+            de_batch, add_special_tokens=True, padding=True,
+            truncation=True, return_tensors='pt', max_length=self.max_length
+        )
+        en_batch_enc = self.tokenizer(
+            en_batch, add_special_tokens=True, padding=True,
+            truncation=True, return_tensors='pt', max_length=self.max_length
+        )
 
-        de_batch_enc_ids = torch.Tensor(de_batch_enc['input_ids']).to(torch.int64)
-        en_batch_enc_ids = torch.Tensor(en_batch_enc['input_ids']).to(torch.int64)
+        de_batch_ids = de_batch_enc['input_ids']
+        en_batch_ids = en_batch_enc['input_ids']
 
-        de_batch_enc_mask = torch.Tensor(de_batch_enc['attention_mask']).to(torch.int64)
-        en_batch_enc_mask = torch.Tensor(en_batch_enc['attention_mask']).to(torch.int64)
+        de_batch_mask = de_batch_enc['attention_mask']
+        en_batch_mask = en_batch_enc['attention_mask']
 
-        return de_batch_enc_ids, de_batch_enc_mask, en_batch_enc_ids, en_batch_enc_mask
+        return de_batch_ids, de_batch_mask, en_batch_ids, en_batch_mask
+
+    def decode_batch(self, batch):
+        batch_ = None
+        if isinstance(batch, list):
+            batch_ = batch
+        elif isinstance(batch, torch.Tensor):
+            batch_ = list(batch.cpu().numpy())
+        elif isinstance(batch, np.ndarray):
+            batch_ = list(batch)
+        else:
+            raise ValueError('batch should be one of list, ndarray or Tensor')
+
+        # TODO: skip_special_tokens does not work while decoding
+        # so we perform decode here indirectly
+        return [
+            self.tokenizer.convert_tokens_to_string(self.tokenizer.convert_ids_to_tokens(b, skip_special_tokens=True))
+            for b in batch_
+        ]
 
     def __len__(self):
         return self.de_text.shape[0]
