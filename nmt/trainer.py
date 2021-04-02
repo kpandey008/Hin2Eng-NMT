@@ -178,7 +178,7 @@ class TransformersForNmtTrainer(Trainer):
         self.tokenizer = self.train_loader.dataset.tokenizer
         self.meteor_score = MeteorScore()
         self.best_score = 0
-        self.chkpt_name = 'chkpt' if chkpt_name is None else chkpt_name
+        self.chkpt_name = 'nmt_chkpt'
 
     def train_step(self, inputs):
         self.optimizer.zero_grad()
@@ -222,8 +222,10 @@ class TransformersForNmtTrainer(Trainer):
         )
 
         # Decode the indices using the tokenizer
+        # TODO: Need to account for the special tokens
+        # when computing the metrics!
         gt = self.tokenizer.batch_decode(list(en.cpu().numpy()))
-        preds = self.tokenizer.batch_decode(list(predictions.cpu().numpy()))
+        preds = self.tokenizer.batch_decode(list(predictions.cpu().numpy()), skip_special_tokens=True)
         self.meteor_score.add(gt, preds)
 
     def on_val_epoch_end(self):
