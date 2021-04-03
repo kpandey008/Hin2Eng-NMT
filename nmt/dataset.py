@@ -38,6 +38,16 @@ class Hin2EngDataset(Dataset):
         return de_text, en_text
 
     def collate_fn(self, batch):
+        if self.mode == 'test':
+            de_batch = list(batch)
+            de_batch_enc = self.tokenizer(
+                de_batch, add_special_tokens=True, padding=True,
+                truncation=True, return_tensors='pt', max_length=self.max_length
+            )
+            de_batch_ids = de_batch_enc['input_ids']
+            de_batch_mask = de_batch_enc['attention_mask']
+            return de_batch_ids, de_batch_mask
+
         de_batch, en_batch = zip(*batch)
         de_batch = list(de_batch)
         en_batch = list(en_batch)
