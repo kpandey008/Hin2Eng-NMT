@@ -3,6 +3,7 @@ import os
 from tokenizers import BertWordPieceTokenizer
 
 
+# TODO: Add more parameters to accept special tokens as input to the tokenizers
 def train_tokenizer(files, vocab_size=30522, save_path=None):
     tokenizer = BertWordPieceTokenizer()
     tokenizer.train(files, vocab_size=vocab_size, special_tokens = ["[S]","[PAD]","[/S]","[UNK]","[MASK]", "[SEP]","[CLS]"])

@@ -8,12 +8,13 @@ from torch.utils.data import Dataset
 
 class Hin2EngDataset(Dataset):
     # NOTE: In the code, we use the prefix `de` to denote Devanagri and `en` to denote English
-    def __init__(self, root, mode='train', tokenizer, max_length=None):
+    def __init__(self, root, tokenizer, mode='train', max_length=None):
         if not os.path.isdir(root):
             raise Exception(f'Path `{root}` does not exist')
 
         self.root = root
         self.mode = mode
+        self.tokenizer = tokenizer
         self.de_path = os.path.join(self.root, f'{self.mode}_hindi.csv')
         self.en_path = os.path.join(self.root, f'{self.mode}_english.csv')
 
@@ -27,8 +28,6 @@ class Hin2EngDataset(Dataset):
         
         if self.mode == 'test':
             self.de_text = pd.read_csv(self.de_file_path)
-
-        self.tokenizer = tokenizer
 
     def __getitem__(self, idx):
         if self.mode == 'test':
