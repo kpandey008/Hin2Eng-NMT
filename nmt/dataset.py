@@ -23,11 +23,11 @@ class Hin2EngDataset(Dataset):
         self.en_text = None
 
         if self.mode == 'train' or  self.mode == 'val':
-            self.de_text = pd.read_csv(self.de_file_path)
-            self.en_text = pd.read_csv(self.en_file_path)
+            self.de_text = pd.read_csv(self.de_path)
+            self.en_text = pd.read_csv(self.en_path)
         
         if self.mode == 'test':
-            self.de_text = pd.read_csv(self.de_file_path)
+            self.de_text = pd.read_csv(self.de_path)
 
     def __getitem__(self, idx):
         if self.mode == 'test':
