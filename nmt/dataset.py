@@ -7,23 +7,33 @@ from torch.utils.data import Dataset
 
 
 class Hin2EngDataset(Dataset):
-    # NOTE: In the code, we use the prefix de to denote Devanagri and `en` to denote English
-    def __init__(self, de_file_path, en_file_path, tokenizer, max_length=None):
-        if not os.path.isfile(de_file_path):
-            raise Exception(f'Path `{de_file_path}` is not a valid file')
-        if not os.path.isfile(en_file_path):
-            raise Exception(f'Path `{en_file_path}` is not a valid file')
+    # NOTE: In the code, we use the prefix `de` to denote Devanagri and `en` to denote English
+    def __init__(self, root, mode='train', tokenizer, max_length=None):
+        if not os.path.isdir(root):
+            raise Exception(f'Path `{root}` does not exist')
 
-        self.de_file_path = de_file_path
-        self.en_file_path = en_file_path
+        self.root = root
+        self.mode = mode
+        self.de_path = os.path.join(self.root, f'{self.mode}_hindi.csv')
+        self.en_path = os.path.join(self.root, f'{self.mode}_english.csv')
+
         self.max_length = max_length
+        self.de_text = None
+        self.en_text = None
 
-        self.de_text = pd.read_csv(self.de_file_path)
-        self.en_text = pd.read_csv(self.en_file_path)
+        if self.mode == 'train' or  self.mode == 'val':
+            self.de_text = pd.read_csv(self.de_file_path)
+            self.en_text = pd.read_csv(self.en_file_path)
+        
+        if self.mode == 'test':
+            self.de_text = pd.read_csv(self.de_file_path)
 
         self.tokenizer = tokenizer
 
     def __getitem__(self, idx):
+        if self.mode == 'test':
+            return self.de_text['hindi'][idx]
+
         de_text = self.de_text['Hindi'][idx]
         en_text = self.en_text['English'][idx]
         return de_text, en_text
