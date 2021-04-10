@@ -3,12 +3,21 @@ import os
 from tokenizers import BertWordPieceTokenizer
 
 
-# TODO: Add more parameters to accept special tokens as input to the tokenizers
-def train_tokenizer(files, vocab_size=30522, save_path=None):
-    tokenizer = BertWordPieceTokenizer()
-    tokenizer.train(files, vocab_size=vocab_size, special_tokens = ["[S]","[PAD]","[/S]","[UNK]","[MASK]", "[SEP]","[CLS]"])
+def train_tokenizer(
+    files, vocab_size=30522, backend='wordpiece', unk_token='[UNK]', sep_token='[SEP]', pad_token='[PAD]',
+    cls_token='[CLS]', mask_token='[MASK]', save_path=None, **kwargs
+):
+    special_tokens = [unk_token, sep_token, pad_token, cls_token, mask_token]
+    if backend == 'wordpiece':
+        tokenizer = BertWordPieceTokenizer()
+    elif backend == 'bytebpe':
+        tokenizer = ByteLevelBPETokenizer()
+    else:
+        raise NotImplementedError(f'The tokenizer scheme {backend} is not yet supported!')
+    tokenizer.train(files, vocab_size=vocab_size, special_tokens=special_tokens, **kwargs)
     print(f'Trained tokenizer')
 
+    # Save the tokenizer
     if save_path is not None:
         os.makedirs(save_path, exist_ok=True)
         tokenizer.save_model(save_path)
