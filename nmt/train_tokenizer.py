@@ -1,6 +1,6 @@
 import os
 
-from tokenizers import BertWordPieceTokenizer
+from tokenizers import BertWordPieceTokenizer, ByteLevelBPETokenizer
 
 
 def train_tokenizer(
