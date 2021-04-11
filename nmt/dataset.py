@@ -1,6 +1,6 @@
+import csv
 import numpy as np
 import os
-import pandas as pd
 import torch
 
 from torch.utils.data import Dataset
@@ -8,41 +8,49 @@ from torch.utils.data import Dataset
 
 class Hin2EngDataset(Dataset):
     # NOTE: In the code, we use the prefix `de` to denote Devanagri and `en` to denote English
-    def __init__(self, root, tokenizer, mode='train', max_length=None):
+    def __init__(self, root, de_vocab, en_vocab, mode='train', max_length=None):
         if not os.path.isdir(root):
             raise Exception(f'Path `{root}` does not exist')
 
         self.root = root
         self.mode = mode
-        self.tokenizer = tokenizer
+        self.de_vocab = de_vocab
+        self.en_vocab = en_vocab
         self.de_path = os.path.join(self.root, f'{self.mode}_hindi.csv')
         self.en_path = os.path.join(self.root, f'{self.mode}_english.csv')
 
         self.max_length = max_length
-        self.de_text = None
-        self.en_text = None
+        self.de_text = []
+        self.en_text = []
 
         if self.mode == 'train' or  self.mode == 'val':
-            self.de_text = pd.read_csv(self.de_path)
-            self.en_text = pd.read_csv(self.en_path)
+            with open(self.de_path, 'r') as de, open(self.en_path, 'r') as en:
+                de_reader = csv.reader(de)
+                en_reader = csv.reader(en)
+                for de_row, en_row in zip(de_reader, en_reader):
+                    self.de_text.append(de_row)
+                    self.en_text.append(en_row)
         
         if self.mode == 'test':
-            self.de_text = pd.read_csv(self.de_path)
+            with open(self.de_path, 'r') as de:
+                de_reader = csv.reader(de)
+                for de_row in de_reader:
+                    self.de_text.append(de_row)
 
     def __getitem__(self, idx):
         if self.mode == 'test':
-            return self.de_text['hindi'][idx]
+            return self.de_text[idx]
 
-        de_text = self.de_text['Hindi'][idx]
-        en_text = self.en_text['English'][idx]
+        de_text = self.de_text[idx]
+        en_text = self.en_text[idx]
         return de_text, en_text
 
     def collate_fn(self, batch):
         if self.mode == 'test':
             de_batch = list(batch)
-            de_batch_enc = self.tokenizer(
+            de_batch_enc = self.de_vocab(
                 de_batch, add_special_tokens=True, padding=True,
-                truncation=True, return_tensors='pt', max_length=self.max_length
+                truncation=True, max_length=self.max_length
             )
             de_batch_ids = de_batch_enc['input_ids']
             de_batch_mask = de_batch_enc['attention_mask']
@@ -53,13 +61,13 @@ class Hin2EngDataset(Dataset):
         en_batch = list(en_batch)
 
         # Encode batches and compute token ids and attention masks
-        de_batch_enc = self.tokenizer(
+        de_batch_enc = self.de_vocab(
             de_batch, add_special_tokens=True, padding=True,
-            truncation=True, return_tensors='pt', max_length=self.max_length
+            truncation=True, max_length=self.max_length
         )
-        en_batch_enc = self.tokenizer(
+        en_batch_enc = self.en_vocab(
             en_batch, add_special_tokens=True, padding=True,
-            truncation=True, return_tensors='pt', max_length=self.max_length
+            truncation=True, max_length=self.max_length
         )
 
         de_batch_ids = de_batch_enc['input_ids']
@@ -70,23 +78,5 @@ class Hin2EngDataset(Dataset):
 
         return de_batch_ids, de_batch_mask, en_batch_ids, en_batch_mask
 
-    def decode_batch(self, batch):
-        batch_ = None
-        if isinstance(batch, list):
-            batch_ = batch
-        elif isinstance(batch, torch.Tensor):
-            batch_ = list(batch.cpu().numpy())
-        elif isinstance(batch, np.ndarray):
-            batch_ = list(batch)
-        else:
-            raise ValueError('batch should be one of list, ndarray or Tensor')
-
-        # TODO: skip_special_tokens does not work while decoding
-        # so we perform decode here indirectly
-        return [
-            self.tokenizer.convert_tokens_to_string(self.tokenizer.convert_ids_to_tokens(b, skip_special_tokens=True))
-            for b in batch_
-        ]
-
     def __len__(self):
-        return self.de_text.shape[0]
+        return len(self.de_text)
