@@ -1,15 +1,13 @@
 import contractions
 import csv
 import os
-import pandas as pd
 import re
 import string
+import unicodedata
 
 from indicnlp.tokenize import indic_tokenize
 from indicnlp.script import  indic_scripts as isc
 from indicnlp.normalize import indic_normalize
-from tokenizers import normalizers
-from tokenizers.normalizers import NFD, StripAccents, Lowercase
 from tqdm import tqdm
 
 
@@ -33,6 +31,11 @@ def remove_contractions(text):
     return contractions.fix(text)
 
 
+def remove_accents(text):
+    normalized_text = unicodedata.normalize('NFKD', text)
+    return normalized_text.encode('ascii', 'ignore').decode('utf-8', 'ignore')
+
+
 def preprocess_hindi_text(hindi_text):
     normalizer = indic_normalize.DevanagariNormalizer()
     normalized_text = normalizer.normalize(hindi_text)
@@ -49,9 +52,10 @@ def preprocess_hindi_text(hindi_text):
 
 
 def preprocess_english_text(english_text):
-    normalizer = normalizers.Sequence([NFD(), StripAccents(), Lowercase()])
+    # normalizer = normalizers.Sequence([NFD(), StripAccents(), Lowercase()])
     filtered_text = remove_contractions(english_text)
-    filtered_text = normalizer.normalize_str(filtered_text)
+    filtered_text = remove_accents(filtered_text)
+    filtered_text = filtered_text.lower()
     filtered_text = remove_special_characters(filtered_text)
     if filtered_text == "":
         return -1
@@ -60,7 +64,14 @@ def preprocess_english_text(english_text):
 
 def generate_filtered_datasets(raw_file_path, de_save_path, en_save_path):
     # Generate clean datasets for both hindi and english
-    df = pd.read_csv(raw_file_path)
+    # df = pd.read_csv(raw_file_path)
+    english_sentences = []
+    hindi_sentences = []
+    with open(raw_file_path, 'r') as fp:
+        reader = csv.DictReader(fp)
+        for row in reader:
+            english_sentences.append(row['english'])
+            hindi_sentences.append(row['hindi'])
 
     count = 0
     with open(de_save_path, 'w') as dfp, open(en_save_path, 'w') as efp:
@@ -73,7 +84,7 @@ def generate_filtered_datasets(raw_file_path, de_save_path, en_save_path):
         de_writer.writeheader()
         en_writer.writeheader()
 
-        for de_text, en_text in tqdm(zip(df['hindi'], df['english'])):
+        for de_text, en_text in tqdm(zip(hindi_sentences, english_sentences)):
             filtered_de_text = preprocess_hindi_text(de_text)
             filtered_en_text = preprocess_english_text(en_text)
 
@@ -108,10 +119,10 @@ def train_val_split(de_path, en_path, save_dir, val_prop=0.05):
 
 
 if __name__ == '__main__':
-    # raw_file_path = '/home/lexent/Hin2Eng-NMT/nmt/data/raw/train.csv'
-    # de_save_path = '/home/lexent/de_cleaned.csv'
-    # en_save_path = '/home/lexent/en_cleaned.csv'
-    # generate_filtered_datasets(raw_file_path, de_save_path, en_save_path)
+    raw_file_path = '/home/lexent/Hin2Eng-NMT/nmt/data/raw/train.csv'
+    de_save_path = '/home/lexent/de_cleaned.csv'
+    en_save_path = '/home/lexent/en_cleaned.csv'
+    generate_filtered_datasets(raw_file_path, de_save_path, en_save_path)
 
     # de_path = '/home/lexent/Hin2Eng-NMT/nmt/data/cleaned/train_hindi.csv'
     # en_path = '/home/lexent/Hin2Eng-NMT/nmt/data/cleaned/train_english.csv'
