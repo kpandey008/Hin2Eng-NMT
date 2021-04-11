@@ -3,7 +3,6 @@ import json
 import nltk
 import numpy as np
 import os
-import spacy
 import torch
 
 from indicnlp.tokenize import indic_tokenize
@@ -47,16 +46,12 @@ class Vocab:
         for token in self.special_tokens:
             self.add_token(token)
 
-    def __call__(
-        self, batch, add_special_tokens=True, padding=True, truncation=True,
-        return_tensors=True, max_length=None
-    ):
-        self.encode_batch(
+    def __call__(self, batch, add_special_tokens=True, padding=True, truncation=True, max_length=None):
+        return self.encode_batch(
             batch,
             add_special_tokens=add_special_tokens,
             padding=padding,
             truncation=truncation,
-            return_tensors=return_tensors,
             max_length=max_length
         )
 

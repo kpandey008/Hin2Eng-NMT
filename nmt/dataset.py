@@ -8,6 +8,7 @@ from torch.utils.data import Dataset
 
 class Hin2EngDataset(Dataset):
     # NOTE: In the code, we use the prefix `de` to denote Devanagri and `en` to denote English
+    # Also this dataset is written to work with cleaned data generated using preprocessing.
     def __init__(self, root, de_vocab, en_vocab, mode='train', max_length=None):
         if not os.path.isdir(root):
             raise Exception(f'Path `{root}` does not exist')
@@ -28,14 +29,17 @@ class Hin2EngDataset(Dataset):
                 de_reader = csv.reader(de)
                 en_reader = csv.reader(en)
                 for de_row, en_row in zip(de_reader, en_reader):
-                    self.de_text.append(de_row)
-                    self.en_text.append(en_row)
+                    self.de_text.append(de_row[-1])
+                    self.en_text.append(en_row[-1])
         
         if self.mode == 'test':
             with open(self.de_path, 'r') as de:
                 de_reader = csv.reader(de)
                 for de_row in de_reader:
                     self.de_text.append(de_row)
+
+        self.de_text = self.de_text[1:]
+        self.en_text = self.en_text[1:]
 
     def __getitem__(self, idx):
         if self.mode == 'test':
