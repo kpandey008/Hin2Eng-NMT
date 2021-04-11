@@ -112,11 +112,17 @@ class Vocab:
                 ids = ids[:max_length]
             if add_special_tokens:
                 ids  = [self.token2id[self.sos_token]] + ids + [self.token2id[self.eos_token]]
-            id_batch.append(ids)
-        id_batch = torch.Tensor(id_batch).long()
+            id_batch.append(torch.Tensor(ids).long())
+
         if padding:
-            pad_sequence(id_batch, padding_value=self.token2id[self.pad_token])
-        return id_batch
+            id_batch = pad_sequence(id_batch, padding_value=self.token2id[self.pad_token], batch_first=True)
+
+        # Generate attn masks
+        attn_batch = (id_batch != self.token2id[self.pad_token]).long()
+        return {
+            'input_ids': id_batch,
+            'attention_mask': attn_batch
+        }
 
     def decode_batch(self, id_batch, skip_special_tokens=True):
         if isinstance(id_batch, torch.Tensor):
@@ -170,7 +176,8 @@ if __name__ == '__main__':
     en_vocab = Vocab(lang='en')
     # en_vocab.fit([en_train], save_dir='/home/lexent/test_nmt/')
     en_vocab.from_pretrained('/home/lexent/test_nmt/vocab.json')
-    batch_ids = en_vocab.encode_batch(['in my dream i was watching'])
-    print(batch_ids)
-    sentence = en_vocab.decode_batch(batch_ids)
+    batch_ids = en_vocab.encode_batch(['in my dream i was watching', 'this is it'])
+    print(batch_ids['input_ids'])
+    print(batch_ids['attention_mask'])
+    sentence = en_vocab.decode_batch(batch_ids['input_ids'])
     print(sentence)
