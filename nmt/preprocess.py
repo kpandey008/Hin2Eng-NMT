@@ -62,6 +62,25 @@ def preprocess_english_text(english_text):
     return filtered_text
 
 
+def generate_filtered_test_dataset(raw_file_path, de_save_path):
+    # Generate clean datasets for hindi test time text
+    hindi_sentences = []
+    with open(raw_file_path, 'r') as fp:
+        reader = csv.DictReader(fp)
+        for row in reader:
+            hindi_sentences.append(row['hindi'])
+
+    with open(de_save_path, 'w') as dfp:
+        de_writer = csv.writer(dfp)
+        for de_text in tqdm(hindi_sentences):
+            filtered_de_text = preprocess_hindi_text(de_text)
+
+            if filtered_de_text == -1:
+                de_writer.writerow([de_text])
+                continue
+            de_writer.writerow([filtered_de_text])
+
+
 def generate_filtered_datasets(raw_file_path, de_save_path, en_save_path):
     # Generate clean datasets for both hindi and english
     # df = pd.read_csv(raw_file_path)
@@ -73,7 +92,6 @@ def generate_filtered_datasets(raw_file_path, de_save_path, en_save_path):
             english_sentences.append(row['english'])
             hindi_sentences.append(row['hindi'])
 
-    count = 0
     with open(de_save_path, 'w') as dfp, open(en_save_path, 'w') as efp:
         de_headers = ['Hindi']
         en_headers = ['English']
@@ -119,10 +137,10 @@ def train_val_split(de_path, en_path, save_dir, val_prop=0.05):
 
 
 if __name__ == '__main__':
-    raw_file_path = '/home/lexent/Hin2Eng-NMT/nmt/data/raw/train.csv'
-    de_save_path = '/home/lexent/de_cleaned.csv'
-    en_save_path = '/home/lexent/en_cleaned.csv'
-    generate_filtered_datasets(raw_file_path, de_save_path, en_save_path)
+    raw_file_path = '/home/lexent/Downloads/hindistatements.csv'
+    de_save_path = '/home/lexent/test_hindi.csv'
+    # en_save_path = '/home/lexent/en_cleaned.csv'
+    generate_filtered_test_dataset(raw_file_path, de_save_path)
 
     # de_path = '/home/lexent/Hin2Eng-NMT/nmt/data/cleaned/train_hindi.csv'
     # en_path = '/home/lexent/Hin2Eng-NMT/nmt/data/cleaned/train_english.csv'
