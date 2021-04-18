@@ -175,7 +175,7 @@ class Trainer:
 
 class TransformersForNmtTrainer(Trainer):
     def init(self):
-        self.tokenizer = self.train_loader.dataset.tokenizer
+        self.pad_token_id = en_vocab.token2id['[PAD]']
         self.meteor_score = MeteorScore()
         self.best_score = 0
         self.chkpt_name = 'nmt_chkpt'
@@ -184,25 +184,25 @@ class TransformersForNmtTrainer(Trainer):
         self.optimizer.zero_grad()
         de, de_attn, en, en_attn = inputs
         de = de.to(self.device)
-        de_attn = de_attn.to(self.device)
+        de_attn = de_attn.bool().to(self.device)
         en = en.to(self.device)
-        en_attn = en_attn.to(self.device)
-        lm_labels = en.clone()
+        en_attn = en_attn.bool().to(self.device)
 
-        predictions_ = self.model(
-            input_ids=de,
-            attention_mask=de_attn,
-            decoder_input_ids=en,
-            decoder_attention_mask=en_attn,
+        tgt_seq_len = en.shape[1] - 1
+        tgt_attn_mask = generate_square_subsequent_mask(tgt_seq_len).to(self.device)
+
+        # Inputs to the decoder will consist of the entire sequence except the last token
+        predictions = self.model(
+            de, en[:, :-1],
+            src_key_padding_masks=de_attn,
+            tgt_key_padding_masks=en_attn[:, :-1],
+            tgt_attn_mask=tgt_attn_mask
         )
-        predictions = predictions_.logits
-        predictions = predictions[:, :-1, :].contiguous()
+        preds = predictions.permute(1, 2, 0).contiguous()
+
+        # Targets will consist of the entire sequence except the first token
         targets = en[:, 1:]
-
-        rearranged_output = predictions.view(predictions.shape[0]*predictions.shape[1], -1)
-        rearranged_target = targets.contiguous().view(-1)
-
-        loss = F.cross_entropy(rearranged_output, rearranged_target, ignore_index=self.tokenizer.convert_tokens_to_ids('[PAD]'))
+        loss = F.cross_entropy(preds, targets, ignore_index=self.pad_token_id)
         loss.backward()
         self.optimizer.step()
         return loss.item()
@@ -211,19 +211,18 @@ class TransformersForNmtTrainer(Trainer):
         meteor = MeteorScore()
         de, de_attn, en, en_attn = inputs
         de = de.to(self.device)
-        de_attn = de_attn.to(self.device)
+        de_attn = de_attn.bool().to(self.device)
         en = en.to(self.device)
-        en_attn = en_attn.to(self.device)
+        en_attn = en_attn.bool().to(self.device)
 
         predictions = self.model.generate(
-            input_ids=de,
-            attention_mask=de_attn,
-            decoder_start_token_id=self.tokenizer.convert_tokens_to_ids('[CLS]'),
+            de, self.device,
+            src_key_padding_masks=de_attn
         )
 
         # Decode the indices using the tokenizer
-        gt = self.val_loader.dataset.decode_batch(list(en.cpu().numpy()))
-        preds = self.val_loader.dataset.decode_batch(list(predictions.cpu().numpy()))
+        gt = en_vocab.decode_batch(list(en.cpu().numpy()))
+        preds = en_vocab.decode_batch(predictions)
         self.meteor_score.add(gt, preds)
 
     def on_val_epoch_end(self):

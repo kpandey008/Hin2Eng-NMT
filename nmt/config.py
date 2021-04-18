@@ -1,4 +1,3 @@
-# Parses the config file used for hyperparameter specification
 import torch
 import torch.optim as optim
 import torch.nn as nn

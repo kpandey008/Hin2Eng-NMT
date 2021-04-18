@@ -11,7 +11,6 @@ from torch.nn.utils.rnn import pad_sequence
 from tqdm import tqdm
 
 
-# from tokenizers import BertWordPieceTokenizer, ByteLevelBPETokenizer
 nltk.download('punkt')
 
 
@@ -113,7 +112,7 @@ class Vocab:
             id_batch = pad_sequence(id_batch, padding_value=self.token2id[self.pad_token], batch_first=True)
 
         # Generate attn masks
-        attn_batch = (id_batch != self.token2id[self.pad_token]).long()
+        attn_batch = (id_batch == self.token2id[self.pad_token]).long()
         return {
             'input_ids': id_batch,
             'attention_mask': attn_batch
@@ -142,7 +141,7 @@ class Vocab:
             return word_tokenize(sentence)
 
 
-# Cant use this because of new competition rules
+# NOTE: Deprecated!
 def train_tokenizer(
     files, vocab_size=30522, backend='wordpiece', unk_token='[UNK]', sep_token='[SEP]', pad_token='[PAD]',
     cls_token='[CLS]', mask_token='[MASK]', save_path=None, **kwargs
