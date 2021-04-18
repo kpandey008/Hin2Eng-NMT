@@ -83,7 +83,6 @@ def generate_filtered_test_dataset(raw_file_path, de_save_path):
 
 def generate_filtered_datasets(raw_file_path, de_save_path, en_save_path):
     # Generate clean datasets for both hindi and english
-    # df = pd.read_csv(raw_file_path)
     english_sentences = []
     hindi_sentences = []
     with open(raw_file_path, 'r') as fp:
