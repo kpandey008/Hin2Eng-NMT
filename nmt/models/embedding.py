@@ -49,3 +49,18 @@ class SinusoidEmbedding:
         e_cos = torch.cos(e_cos * positions).to(device)
         embedding[2 * dim_range + 1] = e_cos
         return embedding.detach()
+
+
+class LearnedEmbedding(nn.Module):
+    def __init__(self, embedding_dim, num_embeddings):
+        super(LearnedEmbedding, self).__init__()
+        self.embedding_dim = embedding_dim
+        self.num_embeddings = num_embeddings
+        self.embedding = nn.Embedding(self.num_embeddings, self.embedding_dim)
+        nn.init.normal_(self.embedding.weight, mean=0, std=self.embedding_dim ** -0.5)
+
+    def forward(self, positions):
+        # Clip the position if it is greater than the max allowed embeddings
+        positions = torch.clamp(positions, max=self.num_embeddings)
+        # Retrieve the corresponding embeddings and permute
+        return self.embedding(positions).permute(1, 0)

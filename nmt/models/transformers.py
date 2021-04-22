@@ -77,7 +77,9 @@ class TransformerEncoderLayer(nn.Module):
 
 
 class NMTModel(nn.Module):
-    def __init__(self, d_model, nhead, de_vocab_size, en_vocab_size):
+    def __init__(
+        self, d_model, nhead, de_vocab_size, en_vocab_size, n_encoder_layers=6, n_decoder_layers=6, pe_mode='learned'
+    ):
         super(NMTModel, self).__init__()
         self.en_vocab_size = en_vocab_size
         self.de_vocab_size = de_vocab_size
@@ -87,13 +89,13 @@ class NMTModel(nn.Module):
         self.de_embedding = nn.Embedding(self.de_vocab_size, embedding_dim=d_model)
 
         # Positional Embeddings
-        self.pe = PositionalEmbedding(d_model)
+        self.pe = PositionalEmbedding(d_model, mode=pe_mode, num_embeddings=128)
 
         # Transformer layers
         encoder_layer = TransformerEncoderLayer(d_model, nhead)
         decoder_layer = TransformerDecoderLayer(d_model, nhead)
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=6)
-        self.decoder = nn.TransformerDecoder(decoder_layer, num_layers=6)
+        self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=n_encoder_layers)
+        self.decoder = nn.TransformerDecoder(decoder_layer, num_layers=n_decoder_layers)
 
         # Clf
         self.clf = nn.Linear(d_model, self.en_vocab_size)
