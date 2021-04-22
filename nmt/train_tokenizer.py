@@ -100,7 +100,7 @@ class Vocab:
         id_batch = []
         for sentence in batch:
             tokens = self.get_tokens(sentence)
-            ids = [self.token2id.get(token, self.unk_token) for token in tokens]
+            ids = [self.token2id.get(token, self.token2id[self.unk_token]) for token in tokens]
             
             if max_length is not None and truncation is True:
                 ids = ids[:max_length]

@@ -36,7 +36,7 @@ class Hin2EngDataset(Dataset):
             with open(self.de_path, 'r') as de:
                 de_reader = csv.reader(de)
                 for de_row in de_reader:
-                    self.de_text.append(de_row)
+                    self.de_text.append(de_row[-1])
 
         self.de_text = self.de_text[1:]
         self.en_text = self.en_text[1:]
