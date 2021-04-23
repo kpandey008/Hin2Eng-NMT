@@ -22,11 +22,6 @@ class TransformerDecoderLayer(nn.Module):
 
         self.activation = nn.ReLU()
 
-    def __setstate__(self, state):
-        if 'activation' not in state:
-            state['activation'] = F.relu
-        super(TransformerDecoderLayer, self).__setstate__(state)
-
     def forward(self, tgt, memory, tgt_mask=None, memory_mask=None,
                 tgt_key_padding_mask=None, memory_key_padding_mask=None):
         tgt2 = self.self_attn(tgt, tgt, tgt, attn_mask=tgt_mask,
@@ -59,11 +54,6 @@ class TransformerEncoderLayer(nn.Module):
         self.dropout2 = nn.Dropout(dropout)
 
         self.activation = nn.ReLU()
-
-    def __setstate__(self, state):
-        if 'activation' not in state:
-            state['activation'] = F.relu
-        super(TransformerEncoderLayer, self).__setstate__(state)
 
     def forward(self, src, src_mask=None, src_key_padding_mask=None):
         src2 = self.self_attn(src, src, src, attn_mask=src_mask,
@@ -120,7 +110,6 @@ class NMTModel(nn.Module):
         return self.clf(out)
 
     def generate(self, src_ids, device, src_key_padding_masks=None, src_attn_mask=None, max_length=20):
-        # Use the device from one of nn modules!
         sos_token_id = en_vocab.token2id[en_vocab.sos_token]
         eos_token_id = en_vocab.token2id[en_vocab.eos_token]
 
