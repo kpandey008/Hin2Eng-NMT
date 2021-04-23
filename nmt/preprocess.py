@@ -16,14 +16,14 @@ def remove_special_characters_hindi(text):
     # This means that in the english sentence we need to keep `.` and remove
     # other punctuations.
     # Refer to https://unicode.org/charts/PDF/U0900.pdf for Hindi unicode representation
-    pat = r'[^\u0900-\u097F,]'
+    pat = r'[^\u0900-\u097F,;?!-" |]'
     return re.sub(pat, '', text)
 
 
 def remove_special_characters(text):
     # Remove all special characters except punctuations (only . and ,)
     # is kept as dheerga virama in hindi is preserved.
-    pat = r'[^a-zA-z0-9., ]'
+    pat = r'[^a-zA-z0-9.,;?!-" ]'
     return re.sub(pat, '', text)
 
 
