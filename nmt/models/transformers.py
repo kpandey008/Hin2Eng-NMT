@@ -38,6 +38,88 @@ class TransformerDecoderLayer(nn.Module):
         return tgt
 
 
+class TransformerEncoderFusedAttnLayer(nn.Module):
+    def __init__(self, d_model, head_conf=[4, 8], dim_feedforward=2048, dropout=0.1, activation="relu",
+                 layer_norm_eps=1e-5):
+        super(TransformerEncoderFusedAttnLayer, self).__init__()
+        self.head_conf = head_conf
+        self.self_attn_list = nn.ModuleList()
+        for head in self.head_conf:
+            self.self_attn_list.append(nn.MultiheadAttention(d_model, head, dropout=dropout))
+
+        # Implementation of Feedforward model
+        self.linear1 = nn.Linear(d_model, dim_feedforward)
+        self.dropout = nn.Dropout(dropout)
+        self.linear2 = nn.Linear(dim_feedforward, d_model)
+
+        self.norm1 = nn.LayerNorm(d_model, eps=layer_norm_eps)
+        self.norm2 = nn.LayerNorm(d_model, eps=layer_norm_eps)
+        self.dropout1 = nn.Dropout(dropout)
+        self.dropout2 = nn.Dropout(dropout)
+
+        self.activation = nn.ReLU()
+
+    def forward(self, src, src_mask=None, src_key_padding_mask=None):
+        # TODO: This operation can also be concat (and needs to be experimented with)
+        src2 = 0
+        for attn_module in self.self_attn_list:
+            src2 += attn_module(src, src, src, attn_mask=src_mask,
+                                key_padding_mask=src_key_padding_mask)[0]
+        src = src + self.dropout1(src2)
+        src = self.norm1(src)
+        src2 = self.linear2(self.dropout(self.activation(self.linear1(src))))
+        src = src + self.dropout2(src2)
+        src = self.norm2(src)
+        return src
+    
+    def __repr__(self):
+        return self.__class__.__name__ + f'()'
+
+
+class TransformerDecoderFusedAttnLayer(nn.Module):
+    def __init__(self, d_model, head_conf=[4, 8], dim_feedforward=2048, dropout=0.1, activation="relu",
+                 layer_norm_eps=1e-5, batch_first=False):
+        super(TransformerDecoderFusedAttnLayer, self).__init__()
+        self.head_conf = head_conf
+        self.self_attn_list = nn.ModuleList()
+        for head in self.head_conf:
+            self.self_attn_list.append(nn.MultiheadAttention(d_model, head, dropout=dropout))
+
+        self.multihead_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
+        self.linear1 = nn.Linear(d_model, dim_feedforward)
+        self.dropout = nn.Dropout(dropout)
+        self.linear2 = nn.Linear(dim_feedforward, d_model)
+
+        self.norm1 = nn.LayerNorm(d_model, eps=layer_norm_eps)
+        self.norm2 = nn.LayerNorm(d_model, eps=layer_norm_eps)
+        self.norm3 = nn.LayerNorm(d_model, eps=layer_norm_eps)
+        self.dropout1 = nn.Dropout(dropout)
+        self.dropout2 = nn.Dropout(dropout)
+        self.dropout3 = nn.Dropout(dropout)
+
+        self.activation = nn.ReLU()
+
+    def forward(self, tgt, memory, tgt_mask=None, memory_mask=None,
+                tgt_key_padding_mask=None, memory_key_padding_mask=None):
+        tgt2 = 0
+        for attn_module in self.self_attn_list:
+            tgt2 += attn_module(tgt, tgt, tgt, attn_mask=tgt_mask,
+                                key_padding_mask=tgt_key_padding_mask)[0]
+        tgt = tgt + self.dropout1(tgt2)
+        tgt = self.norm1(tgt)
+        tgt2 = self.multihead_attn(tgt, memory, memory, attn_mask=memory_mask,
+                                   key_padding_mask=memory_key_padding_mask)[0]
+        tgt = tgt + self.dropout2(tgt2)
+        tgt = self.norm2(tgt)
+        tgt2 = self.linear2(self.dropout(self.activation(self.linear1(tgt))))
+        tgt = tgt + self.dropout3(tgt2)
+        tgt = self.norm3(tgt)
+        return tgt
+
+    def __repr__(self):
+        return self.__class__.__name__ + f'()'
+
+
 class TransformerEncoderLayer(nn.Module):
     def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1, activation="relu",
                  layer_norm_eps=1e-5):

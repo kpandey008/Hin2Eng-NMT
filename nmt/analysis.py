@@ -9,6 +9,8 @@ from indicnlp.tokenize import indic_tokenize
 from nltk.tokenize import word_tokenize
 from tqdm import tqdm
 
+from preprocess import remove_accents
+
 
 sns.set()
 
@@ -44,7 +46,9 @@ def plot_sentence_length(raw_corpus_file_path, save_path=None, hist_kwargs={}, *
     # Return some essential statistics (mean, median etc.)
     return {
         'hi_mean': np.mean(hindi_token_lengths),
+        'hi_max': np.max(hindi_token_lengths),
         'en_mean': np.mean(english_token_lengths),
+        'en_max': np.max(english_token_lengths),
         'hi_median': np.median(hindi_token_lengths),
         'en_median': np.median(english_token_lengths)
     }
@@ -86,6 +90,20 @@ def get_contractions_counts(raw_corpus_file_path):
     return total_count, n_contractions
 
 
+def get_accents_counts(raw_corpus_file_path):
+    n_accents = 0
+    total_count = 0
+    with open(raw_corpus_file_path, 'r') as fp:
+        reader = csv.DictReader(fp)
+        for idx, line in tqdm(enumerate(reader)):
+            fixed_text = remove_accents(line['english'])
+            if fixed_text != line['english']:
+                n_accents += 1
+            total_count += 1
+    print(f'Analyzed {total_count} sentences. Found {n_accents} english sentences with Accents!')
+    return total_count, n_accents
+
+
 def get_tokens(sentence, lang='hi'):
     if lang == 'hi':
         return indic_tokenize.trivial_tokenize(sentence)
@@ -95,7 +113,8 @@ def get_tokens(sentence, lang='hi'):
 
 if __name__ == '__main__':
     raw_corpus_file_path = '/home/lexent/Hin2Eng-NMT/nmt/data/raw/train.csv'
-    # save_path = '/home/lexent/fig.png'
+    save_path = '/home/lexent/fig.png'
     # res = plot_sentence_length(raw_corpus_file_path, save_path=save_path, figsize=(16, 8))
+    # res = get_contractions_counts(raw_corpus_file_path)
     res = get_accents_counts(raw_corpus_file_path)
     print(res)
