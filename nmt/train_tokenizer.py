@@ -3,6 +3,7 @@ import json
 import nltk
 import numpy as np
 import os
+import random
 import torch
 
 from indicnlp.tokenize import indic_tokenize
@@ -12,7 +13,6 @@ from tqdm import tqdm
 
 
 nltk.download('punkt')
-
 
 class Vocab:
     def __init__(self, sos_token='[CLS]', eos_token='[SEP]', pad_token='[PAD]', unk_token='[UNK]', lang='hi'):
@@ -45,13 +45,14 @@ class Vocab:
         for token in self.special_tokens:
             self.add_token(token)
 
-    def __call__(self, batch, add_special_tokens=True, padding=True, truncation=True, max_length=None):
+    def __call__(self, batch, add_special_tokens=True, padding=True, truncation=True, max_length=None, shuffle=False):
         return self.encode_batch(
             batch,
             add_special_tokens=add_special_tokens,
             padding=padding,
             truncation=truncation,
-            max_length=max_length
+            max_length=max_length,
+            shuffle=shuffle
         )
 
     def add_token(self, token):
@@ -92,7 +93,7 @@ class Vocab:
             if token not in self.unique_tokens:
                 raise Warning(f'Special token {token} not found in the pretrained vocab!')
 
-    def encode_batch(self, batch, add_special_tokens=True, padding=True, truncation=True, max_length=None):
+    def encode_batch(self, batch, add_special_tokens=True, padding=True, truncation=True, max_length=None, shuffle=False):
         if not isinstance(batch, list):
             raise TypeError(f'batch must be a list, found {type(batch)}')
         batch_size = len(batch)
@@ -104,6 +105,8 @@ class Vocab:
             
             if max_length is not None and truncation is True:
                 ids = ids[:max_length]
+            if shuffle is True:
+                ids = random.sample(ids, k=len(ids))
             if add_special_tokens:
                 ids  = [self.token2id[self.sos_token]] + ids + [self.token2id[self.eos_token]]
             id_batch.append(torch.Tensor(ids).long())

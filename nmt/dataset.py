@@ -74,13 +74,40 @@ class Hin2EngDataset(Dataset):
             truncation=True, max_length=self.max_length
         )
 
+        # Shuffle and encode batches
+        de_batch_enc_shuffled = self.de_vocab(
+            de_batch, add_special_tokens=True, padding=True,
+            truncation=True, max_length=self.max_length, shuffle=True
+        )
+        en_batch_enc_shuffled = self.en_vocab(
+            en_batch, add_special_tokens=True, padding=True,
+            truncation=True, max_length=self.max_length, shuffle=True
+        )
+
         de_batch_ids = de_batch_enc['input_ids']
+        de_batch_ids_shuffled = de_batch_enc_shuffled['input_ids']
         en_batch_ids = en_batch_enc['input_ids']
+        en_batch_ids_shuffled = en_batch_enc_shuffled['input_ids']
 
         de_batch_mask = de_batch_enc['attention_mask']
+        de_batch_mask_shuffled = de_batch_enc_shuffled['attention_mask']
         en_batch_mask = en_batch_enc['attention_mask']
+        en_batch_mask_shuffled = en_batch_enc_shuffled['attention_mask']
 
-        return de_batch_ids, de_batch_mask, en_batch_ids, en_batch_mask
+        return {
+            'original': {
+                'de_ids': de_batch_ids,
+                'de_mask': de_batch_mask,
+                'en_ids': en_batch_ids,
+                'en_mask': en_batch_mask
+            },
+            'shuffled': {
+                'de_ids': de_batch_ids_shuffled,
+                'de_mask': de_batch_mask_shuffled,
+                'en_ids': en_batch_ids_shuffled,
+                'en_mask': en_batch_mask_shuffled
+            }
+        }
 
     def __len__(self):
         return len(self.de_text)
