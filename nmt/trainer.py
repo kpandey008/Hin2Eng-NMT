@@ -182,11 +182,15 @@ class TransformersForNmtTrainer(Trainer):
 
     def train_step(self, inputs):
         self.optimizer.zero_grad()
-        de, de_attn, en, en_attn = inputs
+        de, de_attn, en, en_attn = inputs['original']
         de = de.to(self.device)
         de_attn = de_attn.bool().to(self.device)
         en = en.to(self.device)
         en_attn = en_attn.bool().to(self.device)
+
+        de_shuffled, de_attn_shuffled, _, _ = inputs['shuffled']
+        de_shuffled = de_shuffled.to(self.device)
+        de_attn_shuffled = de_attn_shuffled.bool().to(self.device)
 
         tgt_seq_len = en.shape[1] - 1
         tgt_attn_mask = generate_square_subsequent_mask(tgt_seq_len).to(self.device)
@@ -202,7 +206,19 @@ class TransformersForNmtTrainer(Trainer):
 
         # Targets will consist of the entire sequence except the first token
         targets = en[:, 1:]
-        loss = F.cross_entropy(preds, targets, ignore_index=self.pad_token_id)
+        loss1 = F.cross_entropy(preds, targets, ignore_index=self.pad_token_id)
+
+        # Compute the encoder anagram loss
+        _, enc_predictions = self.model.encode(
+            de_shuffled,
+            src_key_padding_masks=de_attn,
+            return_encoder_clf=True
+        )
+        enc_preds = enc_predictions.permute(1, 2, 0).contiguous()
+        loss2 = F.cross_entropy(enc_preds, de, ignore_index=self.pad_token_id)
+
+        # Compute net loss and update params
+        loss = loss1 + loss2
         loss.backward()
         self.optimizer.step()
         return loss.item()

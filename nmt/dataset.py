@@ -95,18 +95,8 @@ class Hin2EngDataset(Dataset):
         en_batch_mask_shuffled = en_batch_enc_shuffled['attention_mask']
 
         return {
-            'original': {
-                'de_ids': de_batch_ids,
-                'de_mask': de_batch_mask,
-                'en_ids': en_batch_ids,
-                'en_mask': en_batch_mask
-            },
-            'shuffled': {
-                'de_ids': de_batch_ids_shuffled,
-                'de_mask': de_batch_mask_shuffled,
-                'en_ids': en_batch_ids_shuffled,
-                'en_mask': en_batch_mask_shuffled
-            }
+            'original': [de_batch_ids, de_batch_mask, en_batch_ids, en_batch_mask],
+            'shuffled': [de_batch_ids_shuffled, de_batch_mask_shuffled, en_batch_ids_shuffled, en_batch_mask_shuffled]
         }
 
     def __len__(self):

@@ -284,7 +284,7 @@ class NMTModel(nn.Module):
         self.pe = PositionalEmbedding(self.d_model, mode=pe_mode, num_embeddings=128)
 
         # Transformer layers
-        encoder_layer = TransformerEncoderDualAttnLayer(self.d_model, self.nhead)
+        encoder_layer = TransformerEncoderLayer(self.d_model, self.nhead)
         decoder_layer = TransformerDecoderLayer(self.d_model, self.nhead)
         self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=self.n_encoder_layers)
         self.decoder = nn.TransformerDecoder(decoder_layer, num_layers=self.n_decoder_layers)
@@ -292,23 +292,38 @@ class NMTModel(nn.Module):
         # Clf
         self.clf = nn.Linear(self.d_model, self.en_vocab_size)
 
-    def forward(self, src_ids, tgt_ids, src_key_padding_masks=None, tgt_key_padding_masks=None, src_attn_mask=None, tgt_attn_mask=None):
+        # Anagram clf
+        self.anagram_clf = nn.Linear(self.d_model, self.de_vocab_size)
+
+    def encode(self, src_ids, src_key_padding_masks=None, src_attn_mask=None, return_encoder_clf=False):
         src_embedding = self.de_embedding(src_ids)
-        tgt_embedding = self.en_embedding(tgt_ids)
 
         # Reshape embedddings into (S, B, D)
         src_embedding = src_embedding.permute(1, 0, 2).contiguous()
-        tgt_embedding = tgt_embedding.permute(1, 0, 2).contiguous()
 
         # Compute positional embeddings for the inputs
         src_pe = self.pe(src_embedding).unsqueeze(1).permute(2, 1, 0)
-        tgt_pe = self.pe(tgt_embedding).unsqueeze(1).permute(2, 1, 0)
 
         # Encoder forward
         memory = self.encoder(src_embedding + src_pe, mask=src_attn_mask, src_key_padding_mask=src_key_padding_masks)
+        if return_encoder_clf is True:
+            return memory, self.anagram_clf(memory)
+        return memory
 
-        # Decoder forward
+    def decode(self, memory, tgt_ids, tgt_key_padding_masks=None, tgt_attn_mask=None):
+        tgt_embedding = self.en_embedding(tgt_ids)
+        tgt_embedding = tgt_embedding.permute(1, 0, 2).contiguous()
+        tgt_pe = self.pe(tgt_embedding).unsqueeze(1).permute(2, 1, 0)
         out = self.decoder(tgt_embedding + tgt_pe, memory, tgt_mask=tgt_attn_mask, tgt_key_padding_mask=tgt_key_padding_masks)
+        return out
+
+    def forward(
+        self, src_ids, tgt_ids,
+        src_key_padding_masks=None, tgt_key_padding_masks=None,
+        src_attn_mask=None, tgt_attn_mask=None
+    ):
+        memory = self.encode(src_ids, src_key_padding_masks=src_key_padding_masks, src_attn_mask=src_attn_mask)
+        out = self.decode(memory, tgt_ids, tgt_key_padding_masks=tgt_key_padding_masks, tgt_attn_mask=tgt_attn_mask)
         return self.clf(out)
 
     def generate(self, src_ids, device, src_key_padding_masks=None, src_attn_mask=None, max_length=20):
