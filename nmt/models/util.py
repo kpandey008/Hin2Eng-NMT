@@ -3,6 +3,38 @@ import torch.nn.functional as F
 import torch.nn as nn
 
 
+class SEAttention(nn.Module):
+    def __init__(self, d_model):
+        super(SEAttention, self).__init__()
+        self.squeeze = nn.AdaptiveAvgPool1d(1)
+        self.excite = nn.Sequential(
+            nn.Linear(d_model, d_model),
+            nn.Sigmoid()
+        )
+
+    def forward(self, input, padding_mask=None):
+        S, B, D = input.shape
+
+        # Zero out the pad tokens to ignore there effect during
+        # SE channel weight computation
+        if padding_mask is not None:
+            padding_mask = padding_mask.unsqueeze(2)
+            B, S, D_ = padding_mask.shape
+            padding_mask = padding_mask.contiguous().view(S, B, D_)
+            input = input * (1 - padding_mask)
+
+        # Squeeze
+        input_ = input.view(B, D, S).contiguous()
+        weights = self.squeeze(input_)
+        weights = weights.permute(0, 2, 1).contiguous()
+
+        # Excitation
+        weights = self.excite(weights).permute(1, 0, 2)
+
+        # Combine
+        return input * weights
+
+
 class PositionalEmbedding(nn.Module):
     def __init__(self, embedding_dim, num_embeddings=None, mode='sinusoid'):
         super(PositionalEmbedding, self).__init__()
