@@ -175,7 +175,7 @@ class Trainer:
 
 class TransformersForNmtTrainer(Trainer):
     def init(self):
-        self.pad_token_id = en_vocab.token2id['[PAD]']
+        self.pad_token_id = en_vocab.token2id[en_vocab.pad_token]
         self.meteor_score = MeteorScore()
         self.best_score = 0
         self.chkpt_name = 'nmt_chkpt'
@@ -208,7 +208,6 @@ class TransformersForNmtTrainer(Trainer):
         return loss.item()
 
     def val_step(self, inputs):
-        meteor = MeteorScore()
         de, de_attn, en, en_attn = inputs
         de = de.to(self.device)
         de_attn = de_attn.bool().to(self.device)
@@ -229,10 +228,19 @@ class TransformersForNmtTrainer(Trainer):
         avg_meteor = self.meteor_score.value()
         print(f'Average Meteor score: {avg_meteor}')
 
-        if self.best_score > avg_meteor:
+        # Save the checkpoint with the best METEOR scores
+        if self.best_score < avg_meteor:
             self.best_score = avg_meteor
             if self.results_dir is not None:
-                self.save(self.results_dir, self.chkpt_name, prefix='best')
+                print(f'Saving best checkpoint for epoch: {self.epoch_idx + 1}')
+                self.save(self.results_dir, self.chkpt_name, prefix=f'best_{self.best_score}')
 
         # Reset the metric
         self.meteor_score.reset()
+
+    def on_train_epoch_end(self):
+        # Save checkpoints every 5 epochs
+        if self.epoch_idx % 5 == 0:
+            if self.results_dir is not None:
+                print(f'Saving checkpoint for epoch: {self.epoch_idx + 1}')
+                self.save(self.results_dir, self.chkpt_name)
