@@ -136,7 +136,7 @@ def train_val_split(de_path, en_path, save_dir, val_prop=0.05):
 
 
 if __name__ == '__main__':
-    raw_file_path = '/home/lexent/Downloads/hindistatements.csv'
+    raw_file_path = '/home/lexent/Downloads/testhindistatements.csv'
     de_save_path = '/home/lexent/test_hindi.csv'
     # en_save_path = '/home/lexent/en_cleaned.csv'
     generate_filtered_test_dataset(raw_file_path, de_save_path)
