@@ -82,6 +82,7 @@ class Trainer:
         epoch_loss = 0
         self.train_progress_bar = tqdm(self.train_loader)
         for idx, inputs in enumerate(self.train_progress_bar):
+            self.optimizer.zero_grad()
             if self.n_train_steps_per_epoch is not None and \
                 (idx + 1) > self.n_train_steps_per_epoch:
                 break
@@ -181,7 +182,6 @@ class TransformersForNmtTrainer(Trainer):
         self.chkpt_name = 'nmt_chkpt'
 
     def train_step(self, inputs):
-        self.optimizer.zero_grad()
         de, de_attn, en, en_attn = inputs
         de = de.to(self.device)
         de_attn = de_attn.bool().to(self.device)
