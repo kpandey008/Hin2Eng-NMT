@@ -4,6 +4,12 @@ import torch.nn as nn
 
 
 class SEAttention(nn.Module):
+    """
+    Implements a Channel Attention Module as proposed in the report.
+    Consists of two main stages:
+    1) Squeeze Module: For computing initial weights
+    2) Excitation Module: For learning transformed weights and attending the input
+    """
     def __init__(self, d_model):
         super(SEAttention, self).__init__()
         self.squeeze = nn.AdaptiveAvgPool1d(1)
@@ -36,6 +42,11 @@ class SEAttention(nn.Module):
 
 
 class PositionalEmbedding(nn.Module):
+    """
+    A PositionalEmbedding module which creates positional embeddings
+    as proposed in https://arxiv.org/abs/1706.03762. Supports both
+    sinusoid and learned positional embeddings.
+    """
     def __init__(self, embedding_dim, num_embeddings=None, mode='sinusoid'):
         super(PositionalEmbedding, self).__init__()
         self.embedding_dim = embedding_dim
@@ -56,11 +67,16 @@ class PositionalEmbedding(nn.Module):
         S, B, D = x.shape
         assert self.embedding_dim == D
         positions = torch.arange(0, S, 1).to(x.device)
+        # Compute position embeddings based on computed positions.
         embeddings = self.pos_embedding(positions)
         return embeddings
 
 
 class SinusoidEmbedding:
+    """
+    Implementation of the Sinusoid position embedding module. Uses the
+    same form as described in https://arxiv.org/abs/1706.03762.
+    """
     def __init__(self, embedding_dim):
         self.embedding_dim = embedding_dim
 
